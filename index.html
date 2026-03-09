@@ -12,20 +12,37 @@
             height: 100vh; 
             background-color: #121212; color: #ffffff; 
             font-family: -apple-system, sans-serif; text-align: center; 
-            user-select: none; /* 텍스트 선택 방지 */
-            touch-action: manipulation; /* 더블탭 확대 방지 */
+            user-select: none; 
+            touch-action: manipulation; 
             overflow: hidden;
+            position: relative; /* 리셋 버튼 위치 기준점 */
         }
         .section { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
         
-        /* 상단: 타이머 영역 */
-        .timer-section { flex-direction: row; gap: 20px; background-color: #1e1e1e; position: relative; }
+        /* 🔄 리셋 버튼 (우측 상단) */
+        .reset-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 1px solid #666;
+            color: #aaa;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            z-index: 10; /* 항상 맨 위에 보이게 */
+        }
+        .reset-btn:active { background: #333; color: #fff; }
+
+        /* 상단: 타이머 영역 (간격 문제 해결) */
+        .timer-section { flex-direction: row; gap: 40px; background-color: #1e1e1e; position: relative; }
         .timer-btn { 
             font-size: 1.5rem; font-weight: bold; width: 80px; height: 80px; 
             border-radius: 50%; border: none; background-color: #333; color: white; cursor: pointer;
         }
         .timer-btn:active { background-color: #555; }
-        .timer-display { font-size: 3rem; font-weight: bold; width: 120px; }
+        .timer-display { font-size: 4rem; font-weight: bold; width: auto; } /* width를 auto로 변경하여 겹침 방지 */
 
         /* 중앙: 카운터 영역 */
         .counter-section { font-size: 13rem; font-weight: bold; background-color: #121212; }
@@ -36,13 +53,15 @@
             flex: 1; margin: 10px; height: 85%; border-radius: 20px; 
             font-size: 3rem; font-weight: bold; border: none; color: white; cursor: pointer;
         }
-        .btn-increase { background-color: #4CAF50; } /* 왼쪽: 카운터 + */
+        .btn-increase { background-color: #4CAF50; }
         .btn-increase:active { background-color: #45a049; }
-        .btn-decrease { background-color: #f44336; } /* 오른쪽: 카운터 - */
+        .btn-decrease { background-color: #f44336; }
         .btn-decrease:active { background-color: #da190b; }
     </style>
 </head>
 <body>
+
+    <button class="reset-btn" onclick="resetAll()">리셋</button>
 
     <div class="section timer-section">
         <button class="timer-btn" onclick="adjustTime(15)">+15</button>
@@ -58,121 +77,13 @@
     </div>
 
     <script>
-        let setTime = 60; // 목표 설정 시간 (기본 60초)
-        let timeLeft = 0; // 현재 카운트다운 중인 시간
+        let setTime = 60; // 목표 설정 시간
+        let timeLeft = 0; // 현재 카운트다운 시간
         let timerInterval = null;
         let count = 0; // 세트 카운터
         
-        // --- iOS 소리 재생을 위한 Web Audio API (교차검증 완료 기능) ---
         let audioCtx = null;
 
         function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-        }
-
-        function playBeep(frequency, duration) {
-            if (!audioCtx) return;
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime); // 소리 높낮이
-            
-            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + duration);
-        }
-
-        // --- 타이머 관련 기능 ---
-        function updateTimerDisplay(seconds) {
-            let m = Math.floor(seconds / 60);
-            let s = seconds % 60;
-            document.getElementById('timerDisplay').innerText = 
-                `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-
-        function adjustTime(seconds) {
-            setTime += seconds;
-            if (setTime > 60) setTime = 60; // 최대 1분
-            if (setTime < 0) setTime = 0;   // 최소 0초
-            
-            // 타이머가 안 돌아가고 있을 때 화면에 설정 시간을 바로 반영
-            if (!timerInterval) {
-                updateTimerDisplay(setTime);
-            }
-        }
-
-        function startTimer() {
-            if (timerInterval) clearInterval(timerInterval); // 기존 타이머 정지
-            
-            timeLeft = setTime; // 설정한 시간부터 카운트다운 시작
-            updateTimerDisplay(timeLeft);
-            
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerDisplay(timeLeft);
-                
-                // 남은 시간 3초, 2초, 1초에 비프음 발생
-                if (timeLeft === 3 || timeLeft === 2 || timeLeft === 1) {
-                    playBeep(800, 0.15); // 짧고 높은 소리
-                }
-                
-                // 0초가 되면 종료음 발생 및 타이머 정지
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                    playBeep(600, 0.5); // 길고 약간 낮은 소리
-                }
-            }, 1000);
-        }
-
-        // --- 카운터 관련 기능 ---
-        function increaseCounter() {
-            initAudio(); // 터치 시 iOS 오디오 정책 잠금 해제
-            
-            count++;
-            if (count > 99) count = 99;
-            document.getElementById('counterDisplay').innerText = count.toString().padStart(2, '0');
-            
-            startTimer(); // ⭐️ 핵심 기능: 세트 증가 시 타이머 자동 시작
-        }
-
-        function decreaseCounter() {
-            initAudio(); // 혹시 -버튼을 먼저 누를 경우를 대비한 오디오 잠금 해제
-            
-            count--;
-            if (count < 0) count = 0;
-            document.getElementById('counterDisplay').innerText = count.toString().padStart(2, '0');
-        }
-
-        // --- 화면 꺼짐 방지 (Wake Lock) ---
-        let wakeLock = null;
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        document.addEventListener('visibilitychange', () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
-        });
-        document.body.addEventListener('click', requestWakeLock, { once: true });
-
-        // 앱 실행 시 최초 설정 시간 표시
-        updateTimerDisplay(setTime);
-    </script>
-</body>
-</html>
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx
