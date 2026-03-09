@@ -86,4 +86,100 @@
 
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playBeep(frequency, duration) {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime); 
+            
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        function updateTimerDisplay(seconds) {
+            let m = Math.floor(seconds / 60);
+            let s = seconds % 60;
+            document.getElementById('timerDisplay').innerText = 
+                `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function adjustTime(seconds) {
+            setTime += seconds;
+            if (setTime > 60) setTime = 60; 
+            if (setTime < 0) setTime = 0;   
+            
+            if (!timerInterval) updateTimerDisplay(setTime);
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval); 
+            
+            timeLeft = setTime; 
+            updateTimerDisplay(timeLeft);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay(timeLeft);
+                
+                if (timeLeft === 3 || timeLeft === 2 || timeLeft === 1) playBeep(800, 0.15); 
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    playBeep(600, 0.5); 
+                }
+            }, 1000);
+        }
+
+        function increaseCounter() {
+            initAudio(); 
+            count++;
+            if (count > 99) count = 99;
+            document.getElementById('counterDisplay').innerText = count.toString().padStart(2, '0');
+            startTimer(); 
+        }
+
+        function decreaseCounter() {
+            initAudio(); 
+            count--;
+            if (count < 0) count = 0;
+            document.getElementById('counterDisplay').innerText = count.toString().padStart(2, '0');
+        }
+
+        // 🔄 초기화(리셋) 기능
+        function resetAll() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            setTime = 60; // 타이머 기준 1분으로 원상복구
+            count = 0;    // 카운터 0으로 원상복구
+            updateTimerDisplay(setTime);
+            document.getElementById('counterDisplay').innerText = "00";
+        }
+
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+            catch (err) { console.error(err); }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
+        });
+        document.body.addEventListener('click', requestWakeLock, { once: true });
+
+        updateTimerDisplay(setTime);
+    </script>
+</body>
+</html>
